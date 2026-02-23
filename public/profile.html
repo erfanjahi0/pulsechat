@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile — PulseChat</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236478ff'/><path d='M7 11h18M7 16h12M7 21h8' stroke='white' stroke-width='2.5' stroke-linecap='round'/></svg>" />
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/app.css" />
+  <script>
+    (function() {
+      const t = localStorage.getItem('pulsechat_theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+      else if (!window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.setAttribute('data-theme', 'light');
+    })();
+  </script>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="profile-page">
+  <header class="profile-topbar">
+    <a href="app.html" class="btn btn-icon" aria-label="Back">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+    </a>
+    <h1 class="profile-topbar-title">Profile Settings</h1>
+    <button class="theme-toggle" id="theme-btn" style="margin-left:auto;">
+      <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun"  width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    </button>
+  </header>
+
+  <div class="profile-content">
+
+    <!-- Avatar -->
+    <div class="profile-avatar-section">
+      <div class="profile-avatar-wrap" id="avatar-wrap" role="button" tabindex="0" aria-label="Change profile picture">
+        <div class="avatar avatar-xl" id="profile-avatar"></div>
+        <div class="profile-avatar-overlay" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+      </div>
+      <input type="file" id="avatar-file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" aria-label="Upload profile picture" />
+      <p id="photo-cooldown-msg" class="form-hint" style="text-align:center;"></p>
+    </div>
+
+    <!-- Display name (no change limit) -->
+    <div class="profile-section">
+      <p class="section-title">Display name</p>
+      <div class="profile-card">
+        <p class="form-hint">You can change your name at any time.</p>
+        <div class="form-group">
+          <label class="form-label" for="display-name">Name</label>
+          <input class="form-input" type="text" id="display-name" placeholder="Your name" autocomplete="name" />
+        </div>
+        <div id="name-error" class="form-error" role="alert"></div>
+        <button class="btn btn-primary" id="save-name-btn" style="align-self:flex-start;">Save name</button>
+      </div>
+    </div>
+
+    <!-- Username (once per week) -->
+    <div class="profile-section">
+      <p class="section-title">Username</p>
+      <div class="profile-card">
+        <p class="form-hint">Your unique @handle. Changeable <strong>once per week</strong>.</p>
+        <div id="username-cooldown-banner" class="cooldown-info hidden">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          <span id="username-cooldown-text"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="username-input">Username</label>
+          <div class="form-input-wrap">
+            <span class="form-prefix">@</span>
+            <input class="form-input has-prefix" type="text" id="username-input"
+                   placeholder="yourhandle" autocomplete="off" autocapitalize="none" spellcheck="false" />
+          </div>
+        </div>
+        <div id="username-check" class="form-hint" aria-live="polite"></div>
+        <div id="username-error" class="form-error" role="alert"></div>
+        <button class="btn btn-primary" id="save-username-btn" style="align-self:flex-start;">Save username</button>
+      </div>
+    </div>
+
+    <!-- Account info (read-only) -->
+    <div class="profile-section">
+      <p class="section-title">Account info</p>
+      <div class="profile-card">
+        <div class="profile-read-field">
+          <div class="profile-field-label">Email</div>
+          <div class="profile-field-value" id="profile-email">—</div>
+        </div>
+        <div class="profile-read-field">
+          <div class="profile-field-label">Auth provider</div>
+          <div class="profile-field-value" id="profile-provider">—</div>
+        </div>
+        <div class="profile-read-field" style="border:none;">
+          <div class="profile-field-label">Member since</div>
+          <div class="profile-field-value" id="profile-since">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change password (email accounts only) -->
+    <div class="profile-section" id="password-section">
+      <p class="section-title">Change Password</p>
+      <div class="profile-card">
+        <p class="form-hint">Enter your current password to verify, then set a new one.</p>
+        <div class="form-group">
+          <label class="form-label" for="old-password">Current password</label>
+          <input class="form-input" type="password" id="old-password" autocomplete="current-password" placeholder="••••••••" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-password">New password</label>
+          <input class="form-input" type="password" id="new-password" autocomplete="new-password" placeholder="At least 6 characters" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="confirm-password">Confirm new password</label>
+          <input class="form-input" type="password" id="confirm-password" autocomplete="new-password" placeholder="Repeat new password" />
+        </div>
+        <div id="password-error" class="form-error" role="alert"></div>
+        <button class="btn btn-primary" id="save-password-btn" style="align-self:flex-start;">Change password</button>
+      </div>
+    </div>
+
+    <!-- Sign out -->
+    <div class="profile-section">
+      <p class="section-title">Session</p>
+      <div class="danger-zone">
+        <div class="danger-zone-title">Sign out</div>
+        <div class="danger-zone-desc">You'll be returned to the sign-in page.</div>
+        <button class="btn btn-danger" id="logout-btn" style="align-self:flex-start;">Sign out</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { auth }        from './assets/js/firebase.js';
+import { requireAuth } from './assets/js/guard.js';
+import { logout, changePassword, friendlyAuthError } from './assets/js/auth.js';
+import { getUser, updateUserProfile, updateProfilePhoto } from './assets/js/users.js';
+import { reserveUsername, isUsernameAvailable } from './assets/js/username.js';
+import { toast, setButtonLoading, showFormError, clearFormError } from './assets/js/ui.js';
+import { getInitials, avatarColor, validateUsername, cooldownDaysLeft, resizeImageToDataURL, debounce } from './assets/js/utils.js';
+import { loadTheme, wireThemeButton } from './assets/js/theme.js';
+
+// NOTE: We intentionally do NOT import updateProfile from Firebase Auth here.
+// Firebase Auth's photoURL only accepts real HTTPS URLs — not base64.
+// Profile photos are stored solely in Firestore.
+
+loadTheme();
+wireThemeButton(document.getElementById('theme-btn'));
+
+const me      = await requireAuth();
+let profile   = await getUser(me.uid);
+const isGoogle = (profile?.authProvider === 'google') ||
+                 (me.providerData?.[0]?.providerId === 'google.com');
+
+// ── Populate UI ───────────────────────────────────────────
+function populateAvatar() {
+  const avEl = document.getElementById('profile-avatar');
+  avEl.style.background = avatarColor(profile?.displayName || '');
+  avEl.innerHTML = '';
+  if (profile?.photoURL) {
+    const img = document.createElement('img');
+    img.src    = profile.photoURL;
+    img.alt    = profile.displayName || '';
+    img.onerror = () => { img.remove(); avEl.textContent = getInitials(profile?.displayName || ''); };
+    avEl.appendChild(img);
+  } else {
+    avEl.textContent = getInitials(profile?.displayName || me.email || '?');
+  }
+}
+
+function populateProfile() {
+  populateAvatar();
+
+  document.getElementById('display-name').value  = profile?.displayName || '';
+  document.getElementById('username-input').value = profile?.username    || '';
+  document.getElementById('profile-email').textContent    = profile?.email || me.email || '—';
+  document.getElementById('profile-provider').textContent = isGoogle ? 'Google account' : 'Email & Password';
+
+  if (profile?.createdAt) {
+    const d = profile.createdAt.toDate ? profile.createdAt.toDate() : new Date(profile.createdAt);
+    document.getElementById('profile-since').textContent =
+      d.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  // Photo cooldown
+  const photoCooldown = cooldownDaysLeft(profile?.lastPhotoChange, 7);
+  const photoMsg = document.getElementById('photo-cooldown-msg');
+  if (photoCooldown > 0) {
+    photoMsg.textContent = `Photo locked for ${photoCooldown} more day${photoCooldown !== 1 ? 's' : ''}.`;
+    photoMsg.style.color = 'var(--warn)';
+  } else {
+    photoMsg.textContent = 'Click to change profile picture';
+    photoMsg.style.color = '';
+  }
+
+  // Username cooldown
+  const uCooldown = cooldownDaysLeft(profile?.lastUsernameChange, 7);
+  const uBanner   = document.getElementById('username-cooldown-banner');
+  const uBtn      = document.getElementById('save-username-btn');
+  const uInput    = document.getElementById('username-input');
+  if (uCooldown > 0) {
+    document.getElementById('username-cooldown-text').textContent =
+      `Username locked for ${uCooldown} more day${uCooldown !== 1 ? 's' : ''}.`;
+    uBanner.classList.remove('hidden');
+    uBtn.disabled   = true;
+    uInput.disabled = true;
+  } else {
+    uBanner.classList.add('hidden');
+    uBtn.disabled   = false;
+    uInput.disabled = false;
+  }
+
+  // Hide password section for Google accounts
+  document.getElementById('password-section').style.display = isGoogle ? 'none' : '';
+}
+
+populateProfile();
+
+// ── Photo upload ──────────────────────────────────────────
+// FIX: Only write to Firestore. Do NOT call updateProfile() on Firebase Auth
+// because Auth rejects base64 data URLs — that was causing the "Failed" toast
+// even though the Firestore write succeeded.
+const avatarWrap = document.getElementById('avatar-wrap');
+const avatarFile = document.getElementById('avatar-file');
+
+function triggerPhotoUpload() {
+  const remaining = cooldownDaysLeft(profile?.lastPhotoChange, 7);
+  if (remaining > 0) {
+    toast(`Photo is locked for ${remaining} more day${remaining !== 1 ? 's' : ''}.`, 'warn');
+    return;
+  }
+  avatarFile.click();
+}
+
+avatarWrap.addEventListener('click',   triggerPhotoUpload);
+avatarWrap.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); triggerPhotoUpload(); }});
+
+avatarFile.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  avatarFile.value = ''; // reset so same file can be picked again
+
+  if (file.size > 10_000_000) { toast('Image must be under 10MB.', 'error'); return; }
+
+  const avEl = document.getElementById('profile-avatar');
+  const prevHtml = avEl.innerHTML;
+  avEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;"><span class="spinner"></span></div>';
+
+  try {
+    // Resize to max 256×256, JPEG 0.82 quality → ~15-40KB
+    const dataURL = await resizeImageToDataURL(file, 256, 0.82);
+
+    // Write ONLY to Firestore (Firebase Auth cannot store base64 photoURL)
+    await updateProfilePhoto(me.uid, dataURL);
+
+    // Re-fetch profile and re-render avatar
+    profile = await getUser(me.uid);
+    populateProfile();
+
+    toast('Profile picture updated!', 'success');
+  } catch (err) {
+    console.error('Photo upload error:', err);
+    avEl.innerHTML = prevHtml;
+    toast('Failed to upload photo. Please try again.', 'error');
+  }
+});
+
+// ── Display name ──────────────────────────────────────────
+document.getElementById('save-name-btn').addEventListener('click', async () => {
+  const btn    = document.getElementById('save-name-btn');
+  const errEl  = document.getElementById('name-error');
+  clearFormError(errEl);
+
+  const newName = document.getElementById('display-name').value.trim();
+  if (!newName)            { showFormError(errEl, 'Name cannot be empty.'); return; }
+  if (newName.length > 60) { showFormError(errEl, 'Name is too long (60 chars max).'); return; }
+
+  setButtonLoading(btn, true);
+  try {
+    // Update only Firestore (displayName, unlike photoURL, is fine in Auth too)
+    const { updateProfile } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+    await updateProfile(auth.currentUser, { displayName: newName }).catch(() => {});
+    await updateUserProfile(me.uid, { displayName: newName });
+    profile = { ...profile, displayName: newName };
+    populateProfile();
+    toast('Name updated!', 'success');
+  } catch (err) {
+    console.error(err);
+    showFormError(errEl, 'Failed to save. Please try again.');
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
+// ── Username availability check ───────────────────────────
+const checkUsername = debounce(async (val) => {
+  const hint = document.getElementById('username-check');
+  val = val.toLowerCase().trim();
+  if (!val || val === profile?.username) { hint.textContent = ''; return; }
+
+  const { valid, error } = validateUsername(val);
+  if (!valid) { hint.textContent = error; hint.className = 'form-hint text-error'; return; }
+
+  hint.textContent = 'Checking…';
+  hint.className   = 'form-hint text-muted';
+  const available  = await isUsernameAvailable(val, me.uid).catch(() => false);
+  if (available) {
+    hint.textContent = `@${val} is available ✓`;
+    hint.className   = 'form-hint text-success';
+  } else {
+    hint.textContent = `@${val} is taken.`;
+    hint.className   = 'form-hint text-error';
+  }
+}, 600);
+
+document.getElementById('username-input').addEventListener('input', e => checkUsername(e.target.value));
+
+// ── Save username ─────────────────────────────────────────
+document.getElementById('save-username-btn').addEventListener('click', async () => {
+  const btn   = document.getElementById('save-username-btn');
+  const errEl = document.getElementById('username-error');
+  clearFormError(errEl);
+
+  const raw = document.getElementById('username-input').value.trim().toLowerCase();
+  const { valid, error } = validateUsername(raw);
+  if (!valid) { showFormError(errEl, error); return; }
+
+  if (raw === profile?.username) { toast('That is already your username.', 'info'); return; }
+
+  setButtonLoading(btn, true);
+  try {
+    await reserveUsername(me.uid, raw, profile?.username || null);
+    profile = await getUser(me.uid);
+    document.getElementById('username-check').textContent = '';
+    populateProfile();
+    toast('Username updated to @' + raw, 'success');
+  } catch (err) {
+    if (err.message === 'USERNAME_TAKEN') {
+      showFormError(errEl, 'That username is already taken.');
+    } else if (err.message?.startsWith('COOLDOWN:')) {
+      const days = err.message.split(':')[1];
+      showFormError(errEl, `Username is locked for ${days} more day${days !== '1' ? 's' : ''}.`);
+    } else {
+      console.error(err);
+      showFormError(errEl, 'Failed to save username. Please try again.');
+    }
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
+// ── Change password ───────────────────────────────────────
+document.getElementById('save-password-btn')?.addEventListener('click', async () => {
+  const btn    = document.getElementById('save-password-btn');
+  const errEl  = document.getElementById('password-error');
+  clearFormError(errEl);
+
+  const oldPw  = document.getElementById('old-password').value;
+  const newPw  = document.getElementById('new-password').value;
+  const confPw = document.getElementById('confirm-password').value;
+
+  if (!oldPw || !newPw || !confPw) { showFormError(errEl, 'Please fill in all fields.'); return; }
+  if (newPw.length < 6)             { showFormError(errEl, 'New password must be at least 6 characters.'); return; }
+  if (newPw !== confPw)             { showFormError(errEl, 'New passwords do not match.'); return; }
+  if (oldPw === newPw)              { showFormError(errEl, 'New password must differ from your current one.'); return; }
+
+  setButtonLoading(btn, true);
+  try {
+    await changePassword(auth.currentUser, oldPw, newPw);
+    document.getElementById('old-password').value     = '';
+    document.getElementById('new-password').value     = '';
+    document.getElementById('confirm-password').value = '';
+    toast('Password changed successfully!', 'success');
+  } catch (err) {
+    const code = err.code || '';
+    if (code.includes('wrong-password') || code.includes('invalid-credential')) {
+      showFormError(errEl, 'Current password is incorrect.');
+    } else {
+      showFormError(errEl, friendlyAuthError(code));
+    }
+    console.error(err);
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
+// ── Logout ────────────────────────────────────────────────
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  try { await logout(); window.location.replace('/index.html'); }
+  catch { toast('Sign out failed.', 'error'); }
+});
+</script>
+</body>
+</html>
