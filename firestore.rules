@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ─────────────────────────────────────────────
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthed() && request.auth.uid == uid;
+    }
+
+    function inChat(chatId) {
+      return isAuthed() &&
+        get(/databases/$(database)/documents/chats/$(chatId))
+          .data.participantsMap[request.auth.uid] == true;
+    }
+
+    // ── Users collection ─────────────────────────────────────
+    match /users/{uid} {
+      // Any authenticated user can read profiles (needed for search + chat list)
+      allow read: if isAuthed();
+
+      // Only the owner can create their own document
+      allow create: if isOwner(uid) && request.resource.data.uid == uid;
+
+      // Owner can update their own document; block field can only be updated by owner
+      allow update: if isOwner(uid);
+
+      // No deletion
+      allow delete: if false;
+    }
+
+    // ── Usernames collection ─────────────────────────────────
+    // Stores { uid, reservedAt } to enforce uniqueness
+    match /usernames/{username} {
+      // Anyone authenticated can read (for availability checks)
+      allow read: if isAuthed();
+
+      // Only create/update if the uid in the document matches the requester
+      // AND the username matches the document ID (lowercase, valid chars)
+      allow create: if isAuthed()
+                    && request.resource.data.uid == request.auth.uid
+                    && username.matches('^[a-z0-9_]{3,20}$');
+
+      // Only the owner can update their reserved username
+      allow update: if isAuthed()
+                    && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid;
+
+      // Only the owner can release their username
+      allow delete: if isAuthed() && resource.data.uid == request.auth.uid;
+    }
+
+    // ── Chats collection ─────────────────────────────────────
+    match /chats/{chatId} {
+      // Only participants can read the chat
+      allow read: if isAuthed()
+                  && resource.data.participantsMap[request.auth.uid] == true;
+
+      // Create: auth user must be a participant
+      allow create: if isAuthed()
+                    && request.resource.data.participantsMap[request.auth.uid] == true
+                    && request.resource.data.participants.hasAll([request.auth.uid]);
+
+      // Update: must be a participant (covers unread resets, lastMessage, typing)
+      allow update: if isAuthed()
+                    && resource.data.participantsMap[request.auth.uid] == true;
+
+      // ── Messages subcollection ───────────────────────────
+      match /messages/{messageId} {
+        // Only participants can read
+        allow read: if inChat(chatId);
+
+        // Create: must be a participant, from must match auth uid, no spoofing
+        allow create: if inChat(chatId)
+                      && request.resource.data.from == request.auth.uid
+                      && request.resource.data.type == 'text'
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() <= 4096;
+
+        // No editing messages
+        allow update: if false;
+
+        // Author can delete their own message (optional)
+        allow delete: if isAuthed() && resource.data.from == request.auth.uid;
+      }
+    }
+  }
+}
