@@ -1,40 +1,66 @@
-// ============================================================
-// chats.js — Chat list, creation, unread counts
-// ============================================================
 import { db } from './firebase.js';
-import {
-  doc, getDoc, setDoc, updateDoc, onSnapshot,
-  collection, query, where, orderBy, limit,
-  serverTimestamp, increment,
+import { 
+  collection, query, where, orderBy, onSnapshot, 
+  doc, setDoc, getDoc, updateDoc, serverTimestamp 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-export function getChatId(uidA, uidB) {
-  return [uidA, uidB].sort().join('_');
+// Subscribe to chat list
+export function subscribeChatList(uid, callback) {
+  // QUERY REQUIRES INDEX: participantsMap ASC, lastMessageAt DESC
+  const q = query(
+    collection(db, 'chats'),
+    where(`participantsMap.${uid}`, '==', true),
+    orderBy('lastMessageAt', 'desc')
+  );
+
+  return onSnapshot(q, (snap) => {
+    const chats = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    callback(chats);
+  });
 }
 
+// Get or Create Chat (Fix for bug #3)
 export async function getOrCreateChat(myUid, otherUid) {
-  const chatId = getChatId(myUid, otherUid);
-  const ref    = doc(db, 'chats', chatId);
-  const snap   = await getDoc(ref);
+  // Sort UIDs to ensure same ID regardless of who starts it
+  const ids = [myUid, otherUid].sort();
+  const chatId = ids.join('_');
+  
+  const chatRef = doc(db, 'chats', chatId);
+  const snap = await getDoc(chatRef);
 
   if (!snap.exists()) {
-    await setDoc(ref, {
-      participants:    [myUid, otherUid],
-      participantsMap: { [myUid]: true, [otherUid]: true },
+    // SECURITY RULE REQUIREMENT:
+    // 1. participants array must contain both UIDs
+    // 2. participantsMap must have both UIDs as true
+    const data = {
+      participants: ids, 
+      participantsMap: {
+        [ids[0]]: true,
+        [ids[1]]: true
+      },
       lastMessageText: '',
-      lastMessageAt:   serverTimestamp(),
+      lastMessageAt: serverTimestamp(),
       lastMessageFrom: null,
-      unreadCount:     { [myUid]: 0, [otherUid]: 0 },
-    });
+      unreadCount: {
+        [ids[0]]: 0,
+        [ids[1]]: 0
+      },
+      typing: {}
+    };
+    
+    // Use setDoc with merge:true to be safe, though not strictly necessary for new doc
+    await setDoc(chatRef, data, { merge: true });
   }
 
   return chatId;
 }
 
-export function subscribeChatList(myUid, callback) {
-  const q = query(
-    collection(db, 'chats'),
-    where(`participantsMap.${myUid}`, '==', true),
+export async function clearUnread(chatId, myUid) {
+  const ref = doc(db, 'chats', chatId);
+  await updateDoc(ref, {
+    [`unreadCount.${myUid}`]: 0
+  });
+}    where(`participantsMap.${myUid}`, '==', true),
     orderBy('lastMessageAt', 'desc'),
     limit(30)
   );
