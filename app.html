@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseChat</title>
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar" role="complementary" aria-label="Chat list">
+        <header class="sidebar-header">
+            <div class="user-profile" id="user-profile-trigger" role="button" tabindex="0" aria-label="Open profile">
+                <div class="avatar" id="current-user-avatar">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                </div>
+                <div class="user-info">
+                    <span class="user-name" id="current-user-name">Loading…</span>
+                    <span class="user-status">Online</span>
+                </div>
+            </div>
+            <div class="sidebar-actions">
+                <button class="btn-icon" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme">
+                    <span id="theme-icon"></span>
+                </button>
+                <button class="btn-icon" id="new-chat-btn" aria-label="Start new chat" title="New Chat">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <line x1="12" y1="8" x2="12" y2="14"/>
+                        <line x1="9" y1="11" x2="15" y2="11"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="search-container">
+            <div class="search-input-wrapper">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" id="user-search" class="search-input" placeholder="Search chats…" aria-label="Search chats">
+                <button class="search-clear hidden" id="search-clear" aria-label="Clear search">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="search-results" class="search-results hidden" role="listbox" aria-label="Search results"></div>
+
+        <nav class="chat-list" id="chat-list" role="list" aria-label="Conversations">
+            <div class="chat-list-loading">
+                <div class="skeleton skeleton-avatar"></div>
+                <div class="skeleton-content">
+                    <div class="skeleton skeleton-name"></div>
+                    <div class="skeleton skeleton-message"></div>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Chat Area -->
+    <main class="chat-area" id="chat-area" role="main">
+        <div class="chat-empty" id="chat-empty">
+            <div class="empty-icon">
+                <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
+            <h2>Select a conversation</h2>
+            <p>Choose a chat from the sidebar or start a new conversation</p>
+        </div>
+
+        <div class="chat-active hidden" id="chat-active">
+            <header class="chat-header">
+                <button class="btn-back" id="btn-back" aria-label="Back">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
+                <div class="chat-user" id="chat-user-info">
+                    <div class="avatar" id="chat-user-avatar">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                    </div>
+                    <div class="chat-user-info">
+                        <span class="chat-user-name" id="chat-user-name">Loading…</span>
+                        <span class="chat-user-status" id="chat-user-status">Active recently</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="messages-container" id="messages-container" role="log" aria-label="Messages">
+                <div class="messages-loading" id="messages-loading">
+                    <div class="message-skeleton"><div class="skeleton skeleton-bubble"></div></div>
+                    <div class="message-skeleton"><div class="skeleton skeleton-bubble"></div></div>
+                </div>
+                <div id="messages-list" role="list"></div>
+            </div>
+
+            <footer class="composer">
+                <form id="message-form" class="message-form">
+                    <div class="composer-input-wrapper">
+                        <textarea id="message-input" class="composer-input" placeholder="Type a message…" rows="1" aria-label="Message"></textarea>
+                    </div>
+                    <button type="submit" class="btn-send" id="btn-send" aria-label="Send" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </svg>
+                    </button>
+                </form>
+            </footer>
+        </div>
+    </main>
+</div>
+
+<!-- Profile Modal -->
+<div class="modal-overlay hidden" id="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="modal">
+        <header class="modal-header">
+            <h2 id="profile-modal-title">Profile Settings</h2>
+            <button class="btn-close" id="close-profile-modal" aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </header>
+        <div class="modal-content">
+            <form id="profile-form">
+                <div class="form-field">
+                    <label for="profile-display-name">Display Name</label>
+                    <input type="text" id="profile-display-name" name="displayName" placeholder="Your name" required>
+                </div>
+                <div class="form-field">
+                    <label for="profile-email">Email <span style="font-size:11px;font-weight:400;color:var(--color-text-tertiary)">(read-only)</span></label>
+                    <input type="email" id="profile-email" name="email" disabled>
+                </div>
+                <div class="form-field">
+                    <label for="profile-username">Username <span style="font-size:11px;font-weight:400;color:var(--color-text-tertiary)">(read-only here)</span></label>
+                    <input type="text" id="profile-username" name="username" disabled placeholder="Set in Profile page">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">
+                    <span class="btn-text">Save Changes</span>
+                    <span class="btn-loading hidden">
+                        <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                        </svg>
+                    </span>
+                </button>
+            </form>
+            <div class="modal-divider"></div>
+            <a href="profile.html" class="btn btn-secondary btn-full" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Full Profile &amp; Settings
+            </a>
+            <div class="modal-divider"></div>
+            <button class="btn btn-danger btn-full" id="logout-btn">Log Out</button>
+        </div>
+    </div>
+</div>
+
+<!-- New Chat Modal -->
+<div class="modal-overlay hidden" id="new-chat-modal" role="dialog" aria-modal="true" aria-labelledby="new-chat-modal-title">
+    <div class="modal">
+        <header class="modal-header">
+            <h2 id="new-chat-modal-title">New Conversation</h2>
+            <button class="btn-close" id="close-new-chat-modal" aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </header>
+        <div class="modal-content">
+            <div class="search-container" style="padding:0 0 12px">
+                <div class="search-input-wrapper">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" id="new-chat-search" class="search-input" placeholder="Search by @username or email…">
+                </div>
+            </div>
+            <div id="new-chat-results" class="new-chat-results">
+                <p style="text-align:center;color:var(--color-text-tertiary);padding:20px;font-size:13px">Search by @username or email</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+<script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
