@@ -1,14 +1,7 @@
 {
   "version": 2,
-  "public": true,
   "rewrites": [
     { "source": "/", "destination": "/home.html" }
-  ],
-  "routes": [
-    { "src": "/", "dest": "/public/home.html" },
-    { "src": "/(home|index|app|profile|404)\\.html", "dest": "/public/$1.html" },
-    { "src": "/assets/(.*)", "dest": "/public/assets/$1" },
-    { "src": "/(.*)", "dest": "/public/404.html" }
   ],
   "headers": [
     {
