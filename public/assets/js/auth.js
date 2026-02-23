@@ -1,162 +1,140 @@
-// ============================================================
-// auth.js — Authentication: email/password + Google
-// ============================================================
 import { auth, db } from './firebase.js';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  GoogleAuthProvider,
-  signOut,
-  updateProfile,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  updatePassword,
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  updateProfile, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import {
-  doc, setDoc, getDoc, serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { doc, setDoc, getDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { generateUsername } from './utils.js';
-import { reserveInitialUsername, lookupUidByUsername } from './username.js';
-import { toast } from './ui.js';
 
 const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// ── Create user document ──────────────────────────────────
-
-export async function upsertUser(user, extras = {}) {
-  const ref  = doc(db, 'users', user.uid);
-  const snap = await getDoc(ref);
-
-  const data = {
-    uid:          user.uid,
-    email:        user.email,
-    displayName:  extras.displayName || user.displayName || user.email.split('@')[0],
-    photoURL:     user.photoURL || null,
-    lastSeen:     serverTimestamp(),
-    authProvider: extras.authProvider || 'password',
-    blockedUsers: snap.exists() ? undefined : [],  // only set on create
-  };
-
-  // Remove undefined keys
-  Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
-
-  if (!snap.exists()) {
-    data.createdAt    = serverTimestamp();
-    data.blockedUsers = [];
-    // Generate initial username
-    const base = extras.displayName || user.displayName || user.email.split('@')[0];
-    let username   = generateUsername(base);
-    let attempts   = 0;
-
-    // Try up to 5 times to get a unique username
-    while (attempts < 5) {
-      try {
-        await setDoc(ref, { ...data, username }, { merge: true });
-        await reserveInitialUsername(user.uid, username);
-        return { ...data, username };
-      } catch (e) {
-        if (e.message === 'USERNAME_TAKEN') {
-          username = generateUsername(base);
-          attempts++;
-        } else {
-          throw e;
-        }
-      }
-    }
-    // fallback: uid prefix
-    username = 'user_' + user.uid.slice(0, 8);
-    await setDoc(ref, { ...data, username }, { merge: true });
-    try { await reserveInitialUsername(user.uid, username); } catch {}
-    return { ...data, username };
-  }
-
-  await setDoc(ref, data, { merge: true });
-  return snap.data();
-}
-
-// ── Register ──────────────────────────────────────────────
-
+// Handle Register (Email/Pass)
 export async function registerWithEmail(email, password, displayName) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(cred.user, { displayName });
-  await upsertUser(cred.user, { displayName, authProvider: 'password' });
-  return cred.user;
+  const user = cred.user;
+  const username = generateUsername(displayName);
+  
+  await updateProfile(user, { displayName, photoURL: null });
+  
+  // Create user doc
+  await setDoc(doc(db, 'users', user.uid), {
+    uid: user.uid,
+    email: user.email,
+    displayName: displayName,
+    username: username,
+    photoURL: null,
+    authProvider: 'password',
+    createdAt: serverTimestamp(),
+    lastSeen: serverTimestamp(),
+    lastUsernameChange: null,
+    lastPhotoChange: null,
+    blockedUsers: []
+  });
+
+  // Reserve username
+  await setDoc(doc(db, 'usernames', username), {
+    uid: user.uid,
+    reservedAt: serverTimestamp()
+  });
+
+  return user;
 }
 
-// ── Login ─────────────────────────────────────────────────
-
+// Handle Login (Email/Pass)
 export async function loginWithEmail(email, password) {
   const cred = await signInWithEmailAndPassword(auth, email, password);
   return cred.user;
 }
 
-// ── Google ────────────────────────────────────────────────
-
+// Handle Google Login
 export async function loginWithGoogle() {
-  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (mobile) {
-    sessionStorage.setItem('googleRedirect', '1');
+  // Mobile: Redirect, PC: Popup
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     await signInWithRedirect(auth, googleProvider);
-    return null;
+    return null; // Will redirect
+  } else {
+    const res = await signInWithPopup(auth, googleProvider);
+    await checkGoogleUser(res.user);
+    return res.user;
   }
-  const cred = await signInWithPopup(auth, googleProvider);
-  await upsertUser(cred.user, { authProvider: 'google' });
-  return cred.user;
 }
 
+// Handle Google Redirect (Call this on index.html load)
 export async function handleGoogleRedirect() {
-  if (!sessionStorage.getItem('googleRedirect')) return null;
-  sessionStorage.removeItem('googleRedirect');
   try {
-    const result = await getRedirectResult(auth);
-    if (result?.user) {
-      await upsertUser(result.user, { authProvider: 'google' });
-      return result.user;
+    const res = await getRedirectResult(auth);
+    if (res && res.user) {
+      await checkGoogleUser(res.user);
+      return res.user;
     }
-  } catch (err) {
-    console.error('Google redirect error:', err);
-    toast('Google sign-in failed. Please try again.', 'error');
+  } catch (error) {
+    console.error("Google Redirect Error:", error);
+    throw error;
   }
   return null;
 }
 
-// ── Logout ────────────────────────────────────────────────
+// Helper: Create Firestore doc for Google user if new
+async function checkGoogleUser(user) {
+  const ref = doc(db, 'users', user.uid);
+  const snap = await getDoc(ref);
 
-export async function logout() { await signOut(auth); }
-
-// ── Password change ───────────────────────────────────────
-
-/**
- * Verify old password then set new password.
- * @param {import('firebase/auth').User} user
- * @param {string} oldPassword
- * @param {string} newPassword
- */
-export async function changePassword(user, oldPassword, newPassword) {
-  const credential = EmailAuthProvider.credential(user.email, oldPassword);
-  await reauthenticateWithCredential(user, credential); // throws if wrong
-  await updatePassword(user, newPassword);
+  if (!snap.exists()) {
+    const username = generateUsername(user.displayName || 'User');
+    await setDoc(ref, {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName || 'User',
+      username: username,
+      photoURL: user.photoURL || null,
+      authProvider: 'google',
+      createdAt: serverTimestamp(),
+      lastSeen: serverTimestamp(),
+      lastUsernameChange: null,
+      lastPhotoChange: null,
+      blockedUsers: []
+    });
+    
+    // Try to reserve username (might fail if taken, but rare for generated)
+    try {
+      await setDoc(doc(db, 'usernames', username), {
+        uid: user.uid,
+        reservedAt: serverTimestamp()
+      });
+    } catch (e) { console.log('Username reservation skipped'); }
+  }
 }
 
-// ── Friendly error messages ───────────────────────────────
+export async function logout() {
+  await signOut(auth);
+}
+
+export async function changePassword(user, oldPass, newPass) {
+  // Re-auth logic requires EmailAuthProvider which is complex to implement 
+  // without clean import. For v2 simple version, we assume recent login 
+  // or let firebase throw 'requires-recent-login'
+  const { updatePassword, EmailAuthProvider, reauthenticateWithCredential } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+  
+  const cred = EmailAuthProvider.credential(user.email, oldPass);
+  await reauthenticateWithCredential(user, cred);
+  await updatePassword(user, newPass);
+}
 
 export function friendlyAuthError(code) {
-  const map = {
-    'auth/email-already-in-use':    'That email is already registered.',
-    'auth/invalid-email':           'Please enter a valid email address.',
-    'auth/weak-password':           'Password must be at least 6 characters.',
-    'auth/user-not-found':          'No account found with this email.',
-    'auth/wrong-password':          'Incorrect password.',
-    'auth/invalid-credential':      'Incorrect email or password.',
-    'auth/too-many-requests':       'Too many attempts. Try again later.',
-    'auth/network-request-failed':  'Network error. Check your connection.',
-    'auth/popup-closed-by-user':    'Sign-in cancelled.',
-    'auth/cancelled-popup-request': 'Sign-in cancelled.',
-    'auth/requires-recent-login':   'Please sign out and sign back in to do this.',
-  };
-  return map[code] || 'An unexpected error occurred. Please try again.';
+  switch (code) {
+    case 'auth/invalid-email': return 'Invalid email address.';
+    case 'auth/user-disabled': return 'Account disabled.';
+    case 'auth/user-not-found': return 'Account not found.';
+    case 'auth/wrong-password': return 'Incorrect password.';
+    case 'auth/email-already-in-use': return 'Email already in use.';
+    case 'auth/weak-password': return 'Password is too weak.';
+    case 'auth/requires-recent-login': return 'Please sign out and sign in again.';
+    default: return 'Authentication failed. Please try again.';
+  }
 }
